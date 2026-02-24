@@ -9,9 +9,11 @@ test('canonicalizeUrl strips tracking params and normalizes host/path', () => {
   assert.equal(output, 'https://example.com/path?a=1&b=2');
 });
 
-test('detectSourceType detects x/youtube/pdf/article', () => {
+test('detectSourceType detects x/youtube/pdf/bluesky/linkedin/article', () => {
   assert.equal(detectSourceType('https://x.com/user/status/123'), 'x');
   assert.equal(detectSourceType('https://www.youtube.com/watch?v=abc'), 'youtube');
   assert.equal(detectSourceType('https://example.com/doc.pdf'), 'pdf');
+  assert.equal(detectSourceType('https://bsky.app/profile/georgediab.com/post/3kabc'), 'bluesky');
+  assert.equal(detectSourceType('https://www.linkedin.com/posts/gdiab_post-example'), 'linkedin');
   assert.equal(detectSourceType('https://example.com/blog/post'), 'article');
 });

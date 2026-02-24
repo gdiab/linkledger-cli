@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { withTempDb } from '../helpers/temp-db.js';
 import { createServiceContext } from '../../src/services/context.js';
 import { IngestWorkerService } from '../../src/services/ingest-worker-service.js';
 import { SaveService } from '../../src/services/save-service.js';
+
+const fixture = (folder: string, name: string): string =>
+  readFileSync(path.join(process.cwd(), 'test', 'fixtures', folder, name), 'utf8');
 
 test('worker parses and enriches saved article', async () => {
   await withTempDb(async () => {
@@ -104,6 +109,66 @@ test('worker requeues retryable failures with backoff and succeeds on next run',
       assert.ok(latestJob);
       assert.equal(latestJob.status, 'done');
       assert.equal(latestJob.attempts, 2);
+    } finally {
+      globalThis.fetch = originalFetch;
+      context.db.close();
+    }
+  });
+});
+
+test('worker uses first-class Bluesky and LinkedIn adapters', async () => {
+  await withTempDb(async () => {
+    const context = createServiceContext();
+    const save = new SaveService(context);
+    const worker = new IngestWorkerService(context);
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('embed.bsky.app/oembed')) {
+        return new Response(fixture('bluesky', 'oembed.json'), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
+      if (url.includes('linkedin.com')) {
+        return new Response(fixture('linkedin', 'page.html'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        });
+      }
+
+      return new Response('<html><body>fallback article</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' }
+      });
+    };
+
+    try {
+      const blueskyItem = save.execute({
+        url: 'https://bsky.app/profile/georgediab.com/post/3kxyz123'
+      }).item;
+      const linkedinItem = save.execute({
+        url: 'https://www.linkedin.com/posts/gdiab_memory-layer-cli'
+      }).item;
+
+      const run = await worker.runOnce({ limit: 20, maxAttempts: 3, baseBackoffMs: 0 });
+      assert.equal(run.succeeded, 2);
+      assert.equal(run.failed, 0);
+      assert.equal(run.requeued, 0);
+
+      const bluesky = context.itemRepository.findById(blueskyItem.id);
+      assert.ok(bluesky);
+      assert.equal(bluesky.source_type, 'bluesky');
+      assert.equal(bluesky.ingest_status, 'enriched');
+
+      const linkedin = context.itemRepository.findById(linkedinItem.id);
+      assert.ok(linkedin);
+      assert.equal(linkedin.source_type, 'linkedin');
+      assert.equal(linkedin.ingest_status, 'enriched');
+      assert.equal(linkedin.author, 'George Diab');
     } finally {
       globalThis.fetch = originalFetch;
       context.db.close();

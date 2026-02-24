@@ -27,7 +27,7 @@ node dist/cli/index.js --help
 - `linkledger save <url> [--note "..."] [--tags a,b] [--json]`
 - `linkledger annotate <item-id> --highlight|--lowlight|--note "..." [--actor human|agent:name] [--confidence 0.0-1.0] [--pin] [--json]`
 - `linkledger tag <item-id> --add a,b [--actor ...] [--json]`
-- `linkledger find <query> [--tags ...] [--type article|x|youtube|pdf] [--since YYYY-MM-DD] [--limit N] [--json]`
+- `linkledger find <query> [--tags ...] [--type article|x|youtube|pdf|bluesky|linkedin] [--since YYYY-MM-DD] [--limit N] [--json]`
 - `linkledger brief <query> [--max-items N] [--expand-chunks] [--json]`
 - `linkledger related <item-id> [--max-items N] [--json]`
 - `linkledger status <item-id> [--json]`
@@ -41,6 +41,8 @@ node dist/cli/index.js --help
 - `x`: oEmbed-based extraction with fallback to article adapter.
 - `youtube`: oEmbed + watch-page metadata extraction with fallback to article adapter.
 - `pdf`: text-native PDF extraction via content stream parsing.
+- `bluesky`: oEmbed + page metadata extraction with article fallback.
+- `linkedin`: page metadata extraction with LinkedIn-specific parsing.
 
 Retryable adapter failures are requeued with exponential backoff in `worker`.
 

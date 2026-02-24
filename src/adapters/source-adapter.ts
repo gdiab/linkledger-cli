@@ -1,3 +1,5 @@
+import type { SourceType } from '../lib/types.js';
+
 export interface AdapterParseResult {
   metadata: {
     title?: string;
@@ -14,6 +16,6 @@ export interface AdapterParseResult {
 
 export interface SourceAdapter {
   supports(url: string): boolean;
-  detectType(url: string): 'article' | 'x' | 'youtube' | 'pdf' | 'unknown';
+  detectType(url: string): SourceType;
   fetchAndParse(input: { url: string }): Promise<AdapterParseResult>;
 }

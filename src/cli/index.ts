@@ -192,7 +192,7 @@ program
   .description('Find items by query with optional filters')
   .argument('<query>', 'Search query')
   .option('--tags <csv>', 'Filter by tags')
-  .option('--type <source-type>', 'Filter by source type (article|x|youtube|pdf)')
+  .option('--type <source-type>', 'Filter by source type (article|x|youtube|pdf|bluesky|linkedin)')
   .option('--since <yyyy-mm-dd>', 'Filter by creation date (inclusive)')
   .option('--limit <n>', 'Result limit', (value) => Number.parseInt(value, 10), 20)
   .option('--json', 'Output machine-readable JSON envelope')

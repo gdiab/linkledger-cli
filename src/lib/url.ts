@@ -48,6 +48,14 @@ export const detectSourceType = (url: string): SourceType => {
     return 'youtube';
   }
 
+  if (host === 'bsky.app' || host.endsWith('.bsky.app') || host.endsWith('.bsky.social')) {
+    return 'bluesky';
+  }
+
+  if (host === 'lnkd.in' || host.endsWith('.lnkd.in') || host === 'linkedin.com' || host.endsWith('.linkedin.com')) {
+    return 'linkedin';
+  }
+
   if (parsed.pathname.toLowerCase().endsWith('.pdf')) {
     return 'pdf';
   }

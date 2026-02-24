@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { AppError } from '../lib/errors.js';
 import { detectSourceType } from '../lib/url.js';
+import type { SourceType } from '../lib/types.js';
 import type { AdapterParseResult, SourceAdapter } from './source-adapter.js';
 
 const stripHtml = (value: string): string =>
@@ -42,7 +43,7 @@ export class XAdapter implements SourceAdapter {
     return this.detectType(url) === 'x';
   }
 
-  detectType(url: string): 'article' | 'x' | 'youtube' | 'pdf' | 'unknown' {
+  detectType(url: string): SourceType {
     return detectSourceType(url);
   }
 

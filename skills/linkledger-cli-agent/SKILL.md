@@ -9,7 +9,7 @@ description: Use this skill when an agent needs to store sources in linkledger-c
 - You need to save links and notes for later reuse.
 - You need to run ingestion and check item/job status.
 - You need ranked retrieval (`find`, `brief`) for drafting or research tasks.
-- You need source-specific ingestion for `article`, `x`, `youtube`, or `pdf`.
+- You need source-specific ingestion for `article`, `x`, `youtube`, `pdf`, `bluesky`, or `linkedin`.
 
 ## Rules
 - Prefer `--json` on all commands for deterministic machine parsing.
