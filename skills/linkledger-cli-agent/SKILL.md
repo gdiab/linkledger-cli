@@ -10,11 +10,48 @@ description: Use this skill when an agent needs to store sources in linkledger-c
 - You need to run ingestion and check item/job status.
 - You need ranked retrieval (`find`, `brief`) for drafting or research tasks.
 - You need source-specific ingestion for `article`, `x`, `youtube`, `pdf`, `bluesky`, or `linkedin`.
+- You are researching sources for a content packet, blog draft, or any writing task.
+- A human sends you a link to remember.
+
+## Setup
+- **If a wrapper script is installed** (e.g., `/opt/homebrew/bin/linkledger`), it handles `cd` into the repo and sets `LINKLEDGER_DB_PATH` automatically — call `linkledger` from anywhere.
+- **Otherwise**, run from the repo directory and set `LINKLEDGER_DB_PATH` explicitly:
+  ```bash
+  export LINKLEDGER_DB_PATH="$HOME/.linkledger/linkledger.db"
+  cd /path/to/linkledger-cli
+  node dist/cli/index.js <command>
+  ```
+- The DB defaults to `.linkledger/linkledger.db` relative to cwd if `LINKLEDGER_DB_PATH` is not set. Set it explicitly to avoid writing to unintended locations.
 
 ## Rules
 - Prefer `--json` on all commands for deterministic machine parsing.
-- For agent annotations (`--actor agent:<name>`), always pass `--confidence 0.0-1.0`.
+- For agent annotations, use `--actor agent:<your-name>` (e.g., `agent:thoth`, `agent:research-scout`).
+- Always pass `--confidence 0.0-1.0` with agent annotations.
 - Keep queries short and specific; broaden only if result count is low.
+
+## When to save
+- **Every source you cite** in a draft, outline, or content packet — save it.
+- **Every link a human sends you** with context — save it immediately with their note.
+- **Newsletter items** you pull for weekly packets — save with `--tags newsletter,<source-name>`.
+- **Don't save** throwaway searches, docs you glanced at but didn't use, or duplicate URLs (dedup is automatic but avoid the noise).
+
+## Annotation conventions
+
+### Actor names
+Use your agent identity: `agent:thoth`, `agent:research-scout`, etc. Human-provided annotations use `human`.
+
+### Confidence guidelines
+| Confidence | Use when |
+|-----------|----------|
+| 0.9–1.0 | Direct quote, verified fact, primary source |
+| 0.7–0.89 | Strong inference from reliable source |
+| 0.5–0.69 | Reasonable interpretation, secondary source |
+| < 0.5 | Speculative, opinion-heavy, or unverified |
+
+### Highlights vs lowlights
+- **Highlight**: key claims, quotable insights, data points, novel framings — things you'd cite.
+- **Lowlight**: caveats, weaknesses, contradictions, things to be cautious about — things that temper the source.
+- **Pin** (`--pin`) a highlight only if it's the single most important takeaway from the source.
 
 ## Core workflow
 1. Save source:
@@ -31,8 +68,9 @@ linkledger status <item-id> --json
 ```
 4. Add annotations/tags:
 ```bash
-linkledger annotate <item-id> --highlight "<text>" --actor agent:researcher --confidence 0.82 --json
-linkledger tag <item-id> --add tag1,tag2 --actor agent:researcher --json
+linkledger annotate <item-id> --highlight "<text>" --actor agent:thoth --confidence 0.82 --json
+linkledger annotate <item-id> --lowlight "<caveat>" --actor agent:thoth --confidence 0.7 --json
+linkledger tag <item-id> --add tag1,tag2 --actor agent:thoth --json
 ```
 5. Retrieve:
 ```bash
@@ -41,6 +79,14 @@ linkledger brief "<task>" --max-items 10 --json
 ```
 
 `brief` includes enrichment fields (`summary`, `key_claims`) after worker ingestion succeeds.
+
+## Content pipeline integration
+When saving sources for a content packet or blog draft:
+1. Save all sources with relevant tags (e.g., `--tags weekly-w09,ai-coding`).
+2. Run the worker to ingest.
+3. Add highlights for the key claims you plan to reference.
+4. Note the `item_id` values — these can be linked to content-board cards for full provenance.
+5. When drafting, use `brief "<topic>"` to pull compact evidence packs instead of re-reading full articles.
 
 ## Recovery workflow
 - If `status.item.ingest_status` is `failed`:
