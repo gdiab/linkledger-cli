@@ -74,9 +74,9 @@ export class RedditBackfillService {
       conflict_item_ids: []
     };
 
-    const updatedItemIds: string[] = [];
     const plannedCanonicalOwners = new Map<string, string>();
     const now = nowIso();
+    const updates: Array<{ id: string; canonical: string }> = [];
 
     for (const row of rows) {
       const canonical = detectRedditCanonical(row);
@@ -105,27 +105,30 @@ export class RedditBackfillService {
         result.updated_canonical += 1;
       }
 
-      if (dryRun) {
-        continue;
-      }
-
-      this.context.db
-        .prepare(
-          `UPDATE items
-           SET source_type = 'reddit',
-               canonical_url = ?,
-               updated_at = ?
-           WHERE id = ?`
-        )
-        .run(canonical, now, row.id);
-
-      updatedItemIds.push(row.id);
+      updates.push({ id: row.id, canonical });
     }
 
     if (!dryRun) {
-      for (const itemId of updatedItemIds) {
-        this.indexService.syncItem(itemId);
-      }
+      const tx = this.context.db.transaction(() => {
+        const updateStmt = this.context.db.prepare(
+          `UPDATE items
+           SET source_type = 'reddit',
+               canonical_url = @canonical,
+               updated_at = @updatedAt
+           WHERE id = @id`
+        );
+
+        for (const update of updates) {
+          updateStmt.run({
+            canonical: update.canonical,
+            updatedAt: now,
+            id: update.id
+          });
+          this.indexService.syncItem(update.id);
+        }
+      });
+
+      tx();
     }
 
     return result;
