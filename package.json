@@ -1,0 +1,28 @@
+{
+  "name": "linkledger-cli",
+  "version": "0.1.0",
+  "description": "CLI-first personal knowledge capture and retrieval for human+agent workflows",
+  "type": "module",
+  "bin": {
+    "linkledger": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "tsx src/cli/index.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.30",
+    "tsx": "^4.20.5",
+    "typescript": "^5.8.3"
+  }
+}
