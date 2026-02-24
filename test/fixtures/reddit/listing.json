@@ -1,0 +1,50 @@
+[
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t3",
+          "data": {
+            "id": "abc123",
+            "title": "Shipping local-first memory for agents",
+            "selftext": "We shipped LinkLedger today.\n\nWould love feedback from folks building agent workflows.",
+            "author": "georgediab",
+            "subreddit": "programming",
+            "created_utc": 1766966400,
+            "url": "https://github.com/gd/linkledger-cli"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t1",
+          "data": {
+            "id": "c_1",
+            "author": "alice",
+            "score": 128,
+            "body": "This is exactly the tooling I wanted for reusable evidence in drafts."
+          }
+        },
+        {
+          "kind": "t1",
+          "data": {
+            "id": "c_2",
+            "author": "bob",
+            "score": 64,
+            "body": "Please keep canonicalization for redd.it and old.reddit links."
+          }
+        },
+        {
+          "kind": "more",
+          "data": {}
+        }
+      ]
+    }
+  }
+]

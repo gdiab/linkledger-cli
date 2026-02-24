@@ -1,4 +1,4 @@
-export type SourceType = 'article' | 'x' | 'youtube' | 'pdf' | 'bluesky' | 'linkedin' | 'unknown';
+export type SourceType = 'article' | 'x' | 'youtube' | 'pdf' | 'bluesky' | 'linkedin' | 'reddit' | 'unknown';
 export type IngestStatus = 'metadata_saved' | 'parsed' | 'enriched' | 'failed';
 export type AnnotationType = 'highlight' | 'lowlight' | 'note';
 

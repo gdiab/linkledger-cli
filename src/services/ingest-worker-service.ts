@@ -2,6 +2,7 @@ import { ArticleAdapter } from '../adapters/article-adapter.js';
 import { BlueskyAdapter } from '../adapters/bluesky-adapter.js';
 import { LinkedInAdapter } from '../adapters/linkedin-adapter.js';
 import { PdfAdapter } from '../adapters/pdf-adapter.js';
+import { RedditAdapter } from '../adapters/reddit-adapter.js';
 import type { SourceAdapter } from '../adapters/source-adapter.js';
 import { XAdapter } from '../adapters/x-adapter.js';
 import { YouTubeAdapter } from '../adapters/youtube-adapter.js';
@@ -52,6 +53,7 @@ export class IngestWorkerService {
   private readonly pdfAdapter = new PdfAdapter();
   private readonly blueskyAdapter = new BlueskyAdapter();
   private readonly linkedinAdapter = new LinkedInAdapter();
+  private readonly redditAdapter = new RedditAdapter();
 
   constructor(private readonly context: ServiceContext) {
     this.indexService = new SearchIndexService(context);
@@ -231,6 +233,10 @@ export class IngestWorkerService {
 
     if (item.source_type === 'linkedin') {
       return [this.linkedinAdapter, this.articleAdapter];
+    }
+
+    if (item.source_type === 'reddit') {
+      return [this.redditAdapter, this.articleAdapter];
     }
 
     if (item.source_type === 'pdf') {

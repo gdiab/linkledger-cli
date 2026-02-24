@@ -9,7 +9,18 @@ test('canonicalizeUrl strips tracking params and normalizes host/path', () => {
   assert.equal(output, 'https://example.com/path?a=1&b=2');
 });
 
-test('detectSourceType detects x/youtube/pdf/bluesky/linkedin/article', () => {
+test('canonicalizeUrl normalizes reddit short-links and host variants', () => {
+  const short = canonicalizeUrl('https://redd.it/AbC123?utm_source=share&share_id=abc');
+  assert.equal(short, 'https://www.reddit.com/comments/abc123');
+
+  const hostVariant = canonicalizeUrl(
+    'https://old.reddit.com/r/programming/comments/AbC123/linkledger_release/?context=3#details'
+  );
+  assert.equal(hostVariant, 'https://www.reddit.com/comments/abc123');
+});
+
+test('detectSourceType detects reddit/x/youtube/pdf/bluesky/linkedin/article', () => {
+  assert.equal(detectSourceType('https://www.reddit.com/r/programming/comments/abc123/post-title'), 'reddit');
   assert.equal(detectSourceType('https://x.com/user/status/123'), 'x');
   assert.equal(detectSourceType('https://www.youtube.com/watch?v=abc'), 'youtube');
   assert.equal(detectSourceType('https://example.com/doc.pdf'), 'pdf');
