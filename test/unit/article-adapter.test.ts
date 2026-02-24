@@ -49,3 +49,37 @@ test('ArticleAdapter fails on empty body', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('ArticleAdapter strips class-selector artifacts from HTML attributes', async () => {
+  const adapter = new ArticleAdapter();
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response(
+      `
+      <html>
+        <head><title>The dark factory is not the point</title></head>
+        <body>
+          <ul class="hidden sm:mt-0 sm:ml-0 [&#38;>li>a]:block [&#38;>li>a]:px-4 [&#38;>li>a]:py-3">
+            <li><a href="/">Home</a></li>
+          </ul>
+          <article>
+            <p>The dark factory is not the point. Teams still need judgment and design ownership.</p>
+          </article>
+        </body>
+      </html>
+      `,
+      { status: 200, headers: { 'content-type': 'text/html' } }
+    );
+
+  try {
+    const result = await adapter.fetchAndParse({ url: 'https://example.com/dark-factory' });
+    const combined = result.chunks.map((chunk) => chunk.text).join('\n');
+
+    assert.equal(combined.includes('[&>li>a]'), false);
+    assert.equal(combined.includes('&#38;'), false);
+    assert.match(combined, /Teams still need judgment and design ownership\./);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
