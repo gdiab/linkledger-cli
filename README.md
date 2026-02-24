@@ -70,3 +70,4 @@ An agent-usage skill is included at:
 - Backup/restore runbook: `docs/backup-restore.md`
 - Benchmarking: `docs/benchmarking.md`
 - Agent brief workflow: `docs/agent-brief-workflow.md`
+- Human validation playbook: `docs/human-test-plan.md`
