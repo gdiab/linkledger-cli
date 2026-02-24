@@ -1,5 +1,6 @@
 import { AppError } from '../lib/errors.js';
 import type { ServiceContext } from './context.js';
+import { StaleRevalidationService } from './stale-revalidation-service.js';
 
 export class StatusService {
   constructor(private readonly context: ServiceContext) {}
@@ -9,6 +10,9 @@ export class StatusService {
     if (!item) {
       throw new AppError('ITEM_NOT_FOUND', `No item found for id ${itemId}`, false);
     }
+
+    const staleService = new StaleRevalidationService(this.context);
+    staleService.queueIfStale(itemId);
 
     const latestJob = this.context.ingestJobRepository.latestByItemId(itemId) ?? null;
     const annotations = this.context.annotationRepository.listByItemId(itemId);

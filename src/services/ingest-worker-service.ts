@@ -1,13 +1,20 @@
 import { ArticleAdapter } from '../adapters/article-adapter.js';
+import { PdfAdapter } from '../adapters/pdf-adapter.js';
+import type { SourceAdapter } from '../adapters/source-adapter.js';
+import { XAdapter } from '../adapters/x-adapter.js';
+import { YouTubeAdapter } from '../adapters/youtube-adapter.js';
 import { asAppError, AppError } from '../lib/errors.js';
 import { createRandomishId } from '../lib/ids.js';
 import { nowIso } from '../lib/time.js';
+import type { Item } from '../lib/types.js';
 import type { ServiceContext } from './context.js';
+import { EnrichmentService } from './enrichment-service.js';
 import { SearchIndexService } from './search-index-service.js';
 
 export interface WorkerRunOptions {
   limit: number;
   maxAttempts: number;
+  baseBackoffMs?: number;
 }
 
 export interface WorkerRunResult {
@@ -15,37 +22,61 @@ export interface WorkerRunResult {
   processed: number;
   succeeded: number;
   failed: number;
+  requeued: number;
   items: Array<{
     job_id: string;
     item_id: string;
-    status: 'parsed' | 'failed';
+    status: 'parsed' | 'failed' | 'requeued';
     error?: string;
+    next_scheduled_at?: string;
   }>;
 }
 
+const isRetryable = (error: AppError, attempts: number, maxAttempts: number): boolean =>
+  error.retryable && attempts < maxAttempts;
+
+const buildBackoffTime = (attempt: number, baseBackoffMs: number): string => {
+  const exponent = Math.max(0, attempt - 1);
+  const delay = baseBackoffMs * 2 ** exponent;
+  return new Date(Date.now() + delay).toISOString();
+};
+
 export class IngestWorkerService {
-  private readonly articleAdapter = new ArticleAdapter();
   private readonly indexService: SearchIndexService;
+  private readonly enrichmentService: EnrichmentService;
+  private readonly articleAdapter = new ArticleAdapter();
+  private readonly xAdapter = new XAdapter();
+  private readonly youtubeAdapter = new YouTubeAdapter();
+  private readonly pdfAdapter = new PdfAdapter();
 
   constructor(private readonly context: ServiceContext) {
     this.indexService = new SearchIndexService(context);
+    this.enrichmentService = new EnrichmentService(context);
   }
 
   async runOnce(options: WorkerRunOptions): Promise<WorkerRunResult> {
     const queued = this.context.ingestJobRepository.listQueued(nowIso(), options.limit);
+    const baseBackoffMs = options.baseBackoffMs ?? 2000;
+
     const result: WorkerRunResult = {
       picked: queued.length,
       processed: 0,
       succeeded: 0,
       failed: 0,
+      requeued: 0,
       items: []
     };
 
     for (const job of queued) {
       result.processed += 1;
       const processingRow = this.context.ingestJobRepository.markProcessing(job.id, nowIso());
+      const item = this.context.itemRepository.findById(processingRow.item_id);
 
       try {
+        if (!item) {
+          throw new AppError('ITEM_NOT_FOUND', `No item found for id ${processingRow.item_id}`, false);
+        }
+
         if (processingRow.attempts > options.maxAttempts) {
           throw new AppError(
             'MAX_ATTEMPTS_EXCEEDED',
@@ -54,12 +85,7 @@ export class IngestWorkerService {
           );
         }
 
-        const item = this.context.itemRepository.findById(processingRow.item_id);
-        if (!item) {
-          throw new AppError('ITEM_NOT_FOUND', `No item found for id ${processingRow.item_id}`, false);
-        }
-
-        if (item.ingest_status !== 'metadata_saved') {
+        if (!['metadata_saved', 'parsed', 'enriched'].includes(item.ingest_status)) {
           throw new AppError(
             'INVALID_INGEST_STATE',
             `Cannot ingest item ${item.id} from state ${item.ingest_status}`,
@@ -67,15 +93,7 @@ export class IngestWorkerService {
           );
         }
 
-        if (!this.articleAdapter.supports(item.canonical_url)) {
-          throw new AppError(
-            'ADAPTER_NOT_IMPLEMENTED',
-            `Source type ${item.source_type} adapter not implemented yet`,
-            false
-          );
-        }
-
-        const parsed = await this.articleAdapter.fetchAndParse({ url: item.canonical_url });
+        const parsed = await this.parseWithFallback(item);
         const now = nowIso();
 
         const tx = this.context.db.transaction(() => {
@@ -101,6 +119,7 @@ export class IngestWorkerService {
             updatedAt: now
           });
 
+          this.enrichmentService.enrichItem(item.id);
           this.indexService.syncItem(item.id);
           this.context.ingestJobRepository.markDone(processingRow.id, now);
         });
@@ -116,6 +135,33 @@ export class IngestWorkerService {
       } catch (error) {
         const appError = asAppError(error);
         const now = nowIso();
+
+        if (isRetryable(appError, processingRow.attempts, options.maxAttempts)) {
+          const nextScheduledAt = buildBackoffTime(processingRow.attempts, baseBackoffMs);
+
+          const tx = this.context.db.transaction(() => {
+            if (item) {
+              this.context.itemRepository.updateIngestError(item.id, appError.message, now);
+            }
+            this.context.ingestJobRepository.requeue(
+              processingRow.id,
+              `${appError.code}: ${appError.message}`,
+              nextScheduledAt,
+              now
+            );
+          });
+          tx();
+
+          result.requeued += 1;
+          result.items.push({
+            job_id: processingRow.id,
+            item_id: processingRow.item_id,
+            status: 'requeued',
+            error: `${appError.code}: ${appError.message}`,
+            next_scheduled_at: nextScheduledAt
+          });
+          continue;
+        }
 
         const tx = this.context.db.transaction(() => {
           this.context.itemRepository.updateStatus(processingRow.item_id, 'failed', appError.message, now);
@@ -139,5 +185,46 @@ export class IngestWorkerService {
     }
 
     return result;
+  }
+
+  private async parseWithFallback(item: Item) {
+    const adapters = this.adapterChain(item);
+    const errors: AppError[] = [];
+
+    for (const adapter of adapters) {
+      try {
+        return await adapter.fetchAndParse({ url: item.canonical_url });
+      } catch (error) {
+        errors.push(asAppError(error));
+      }
+    }
+
+    if (errors.length === 0) {
+      throw new AppError('ADAPTER_NOT_FOUND', `No adapter found for source type ${item.source_type}`, false);
+    }
+
+    const last = errors.at(-1)!;
+    if (errors.length === 1) {
+      throw last;
+    }
+
+    const reasons = errors.map((entry) => `${entry.code}: ${entry.message}`).join(' | ');
+    throw new AppError(last.code, `All adapters failed (${reasons})`, last.retryable);
+  }
+
+  private adapterChain(item: Item): SourceAdapter[] {
+    if (item.source_type === 'x') {
+      return [this.xAdapter, this.articleAdapter];
+    }
+
+    if (item.source_type === 'youtube') {
+      return [this.youtubeAdapter, this.articleAdapter];
+    }
+
+    if (item.source_type === 'pdf') {
+      return [this.pdfAdapter];
+    }
+
+    return [this.articleAdapter];
   }
 }

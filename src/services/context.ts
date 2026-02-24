@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { openDatabase } from '../db/database.js';
 import { AnnotationRepository } from '../repositories/annotation-repository.js';
+import { ArtifactRepository } from '../repositories/artifact-repository.js';
 import { ContentChunkRepository } from '../repositories/content-chunk-repository.js';
 import { IngestJobRepository } from '../repositories/ingest-job-repository.js';
 import { ItemRepository } from '../repositories/item-repository.js';
@@ -11,6 +12,7 @@ export interface ServiceContext {
   db: Database.Database;
   itemRepository: ItemRepository;
   annotationRepository: AnnotationRepository;
+  artifactRepository: ArtifactRepository;
   contentChunkRepository: ContentChunkRepository;
   tagRepository: TagRepository;
   ingestJobRepository: IngestJobRepository;
@@ -24,6 +26,7 @@ export const createServiceContext = (): ServiceContext => {
     db,
     itemRepository: new ItemRepository(db),
     annotationRepository: new AnnotationRepository(db),
+    artifactRepository: new ArtifactRepository(db),
     contentChunkRepository: new ContentChunkRepository(db),
     tagRepository: new TagRepository(db),
     ingestJobRepository: new IngestJobRepository(db),

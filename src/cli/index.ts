@@ -355,20 +355,22 @@ program
   .description('Process queued ingest jobs once')
   .option('--limit <n>', 'Maximum queued jobs to process', (value) => Number.parseInt(value, 10), 10)
   .option('--max-attempts <n>', 'Maximum ingest attempts per job', (value) => Number.parseInt(value, 10), 3)
+  .option('--base-backoff-ms <n>', 'Base backoff in ms for retryable ingestion failures', (value) => Number.parseInt(value, 10), 2000)
   .option('--json', 'Output machine-readable JSON envelope')
-  .action(async (options: JsonOption & { limit: number; maxAttempts: number }) => {
+  .action(async (options: JsonOption & { limit: number; maxAttempts: number; baseBackoffMs: number }) => {
     await runCommandAsync(
       options.json ?? false,
       async () => {
         const service = new IngestWorkerService(context);
         return service.runOnce({
           limit: options.limit,
-          maxAttempts: options.maxAttempts
+          maxAttempts: options.maxAttempts,
+          baseBackoffMs: options.baseBackoffMs
         });
       },
       (data) => {
-        const result = data as { picked: number; succeeded: number; failed: number };
-        return `worker picked=${result.picked} succeeded=${result.succeeded} failed=${result.failed}`;
+        const result = data as { picked: number; succeeded: number; failed: number; requeued: number };
+        return `worker picked=${result.picked} succeeded=${result.succeeded} requeued=${result.requeued} failed=${result.failed}`;
       }
     );
   });

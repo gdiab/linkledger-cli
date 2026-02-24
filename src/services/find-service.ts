@@ -1,5 +1,6 @@
 import type { SourceType } from '../lib/types.js';
 import type { ServiceContext } from './context.js';
+import { StaleRevalidationService } from './stale-revalidation-service.js';
 
 export interface FindInput {
   query: string;
@@ -38,6 +39,7 @@ export class FindService {
   constructor(private readonly context: ServiceContext) {}
 
   execute(input: FindInput): FindResultItem[] {
+    const staleService = new StaleRevalidationService(this.context);
     const rows = this.context.searchIndexRepository.search({
       query: input.query,
       tags: input.tags,
@@ -47,6 +49,8 @@ export class FindService {
     });
 
     return rows.map((row) => {
+      staleService.queueIfStale(row.id);
+
       const titleSnippet = normalizeSnippet(row.title_snippet ?? '');
       const chunkSnippet = normalizeSnippet(row.chunk_snippet ?? '');
       const annotationSnippet = normalizeSnippet(row.annotation_snippet ?? '');

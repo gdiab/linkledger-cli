@@ -48,6 +48,19 @@ export class IngestJobRepository {
       .get(itemId) as IngestJobRow | undefined;
   }
 
+  hasActiveByItemId(itemId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count
+         FROM ingest_jobs
+         WHERE item_id = ?
+         AND status IN ('queued', 'processing')`
+      )
+      .get(itemId) as { count: number };
+
+    return row.count > 0;
+  }
+
   listQueued(nowIso: string, limit: number): IngestJobRow[] {
     return this.db
       .prepare(
@@ -55,7 +68,7 @@ export class IngestJobRepository {
          FROM ingest_jobs
          WHERE status = 'queued'
          AND scheduled_at <= ?
-         ORDER BY created_at ASC
+         ORDER BY scheduled_at ASC, created_at ASC
          LIMIT ?`
       )
       .all(nowIso, limit) as IngestJobRow[];
@@ -93,6 +106,18 @@ export class IngestJobRepository {
          WHERE id = ?`
       )
       .run(error, updatedAt, jobId);
+
+    return this.db.prepare('SELECT * FROM ingest_jobs WHERE id = ?').get(jobId) as IngestJobRow;
+  }
+
+  requeue(jobId: string, error: string, scheduledAt: string, updatedAt: string): IngestJobRow {
+    this.db
+      .prepare(
+        `UPDATE ingest_jobs
+         SET status = 'queued', last_error = ?, scheduled_at = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .run(error, scheduledAt, updatedAt, jobId);
 
     return this.db.prepare('SELECT * FROM ingest_jobs WHERE id = ?').get(jobId) as IngestJobRow;
   }

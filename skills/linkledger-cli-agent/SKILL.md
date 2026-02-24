@@ -9,6 +9,7 @@ description: Use this skill when an agent needs to store sources in linkledger-c
 - You need to save links and notes for later reuse.
 - You need to run ingestion and check item/job status.
 - You need ranked retrieval (`find`, `brief`) for drafting or research tasks.
+- You need source-specific ingestion for `article`, `x`, `youtube`, or `pdf`.
 
 ## Rules
 - Prefer `--json` on all commands for deterministic machine parsing.
@@ -22,7 +23,7 @@ linkledger save "<url>" --note "<optional context>" --tags tag1,tag2 --json
 ```
 2. Run ingestion worker:
 ```bash
-linkledger worker --limit 20 --max-attempts 3 --json
+linkledger worker --limit 20 --max-attempts 3 --base-backoff-ms 2000 --json
 ```
 3. Inspect ingest state if needed:
 ```bash
@@ -39,6 +40,8 @@ linkledger find "<topic>" --limit 20 --json
 linkledger brief "<task>" --max-items 10 --json
 ```
 
+`brief` includes enrichment fields (`summary`, `key_claims`) after worker ingestion succeeds.
+
 ## Recovery workflow
 - If `status.item.ingest_status` is `failed`:
 ```bash
@@ -49,6 +52,7 @@ linkledger worker --limit 20 --json
 ```bash
 linkledger index-rebuild --json
 ```
+- If items are old, `find`/`status` may queue revalidation jobs automatically; run worker again to refresh.
 
 ## Output handling contract
 - Success envelope shape:

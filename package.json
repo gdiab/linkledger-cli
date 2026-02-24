@@ -8,7 +8,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test test/**/*.test.ts",
+    "bench:seed": "node --import tsx scripts/seed-benchmark-data.ts",
+    "bench:find": "node --import tsx scripts/bench-find.ts",
+    "bench:brief": "node --import tsx scripts/bench-brief.ts",
+    "bench": "npm run bench:find && npm run bench:brief",
+    "test": "node --import tsx --test --test-concurrency=1 test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "tsx src/cli/index.ts"
   },

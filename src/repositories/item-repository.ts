@@ -70,6 +70,14 @@ export class ItemRepository {
     ).run(status, error, updatedAt, itemId);
   }
 
+  updateIngestError(itemId: string, error: string | null, updatedAt: string): void {
+    this.db.prepare(
+      `UPDATE items
+       SET ingest_error = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(error, updatedAt, itemId);
+  }
+
   updateAfterParse(input: UpdateAfterParseInput): void {
     this.db.prepare(
       `UPDATE items

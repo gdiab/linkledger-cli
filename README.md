@@ -33,7 +33,18 @@ node dist/cli/index.js --help
 - `linkledger status <item-id> [--json]`
 - `linkledger retry <item-id> [--json]`
 - `linkledger index-rebuild [--json]`
-- `linkledger worker [--limit N] [--max-attempts N] [--json]`
+- `linkledger worker [--limit N] [--max-attempts N] [--base-backoff-ms N] [--json]`
+
+## Ingestion adapters (M2)
+
+- `article`: HTML extraction and chunking.
+- `x`: oEmbed-based extraction with fallback to article adapter.
+- `youtube`: oEmbed + watch-page metadata extraction with fallback to article adapter.
+- `pdf`: text-native PDF extraction via content stream parsing.
+
+Retryable adapter failures are requeued with exponential backoff in `worker`.
+
+In M3, successful ingest also creates enrichment artifacts and moves items to `enriched`.
 
 ## Database path
 
@@ -50,3 +61,10 @@ Override with:
 An agent-usage skill is included at:
 
 - `skills/linkledger-cli-agent/SKILL.md`
+
+## Docs
+
+- JSON contract: `docs/json-contract.md`
+- Backup/restore runbook: `docs/backup-restore.md`
+- Benchmarking: `docs/benchmarking.md`
+- Agent brief workflow: `docs/agent-brief-workflow.md`

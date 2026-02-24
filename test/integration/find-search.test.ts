@@ -109,3 +109,58 @@ test('find matches parsed chunk text and source type filters', async () => {
     }
   });
 });
+
+test('find queues stale revalidation for items older than threshold', async () => {
+  await withTempDb(async () => {
+    const context = createServiceContext();
+    const originalFetch = globalThis.fetch;
+    const previousThreshold = process.env.LINKLEDGER_REVALIDATE_AFTER_DAYS;
+
+    process.env.LINKLEDGER_REVALIDATE_AFTER_DAYS = '30';
+    globalThis.fetch = async () =>
+      new Response(
+        '<html><head><title>Stale Candidate</title></head><body><p>Aged item for revalidation behavior.</p></body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } }
+      );
+
+    try {
+      const saveService = new SaveService(context);
+      const worker = new IngestWorkerService(context);
+      const find = new FindService(context);
+
+      const item = saveService.execute({ url: 'https://example.com/stale-item' }).item;
+      await worker.runOnce({ limit: 10, maxAttempts: 3, baseBackoffMs: 0 });
+
+      const staleFetchedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+      context.db
+        .prepare('UPDATE items SET fetched_at = ?, updated_at = ? WHERE id = ?')
+        .run(staleFetchedAt, staleFetchedAt, item.id);
+
+      const firstResults = find.execute({ query: 'stale candidate', limit: 10 });
+      assert.equal(firstResults.length, 1);
+
+      const activeJobs = context.db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM ingest_jobs WHERE item_id = ? AND status IN ('queued', 'processing')`
+        )
+        .get(item.id) as { count: number };
+      assert.equal(activeJobs.count, 1);
+
+      find.execute({ query: 'stale candidate', limit: 10 });
+      const activeJobsAfterSecondFind = context.db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM ingest_jobs WHERE item_id = ? AND status IN ('queued', 'processing')`
+        )
+        .get(item.id) as { count: number };
+      assert.equal(activeJobsAfterSecondFind.count, 1);
+    } finally {
+      if (previousThreshold === undefined) {
+        delete process.env.LINKLEDGER_REVALIDATE_AFTER_DAYS;
+      } else {
+        process.env.LINKLEDGER_REVALIDATE_AFTER_DAYS = previousThreshold;
+      }
+      globalThis.fetch = originalFetch;
+      context.db.close();
+    }
+  });
+});
