@@ -5,6 +5,30 @@ import type { SourceType } from '../lib/types.js';
 import type { AdapterParseResult, SourceAdapter } from './source-adapter.js';
 
 const MAX_CHUNK_CHARS = 1200;
+const TAG_PATTERN = /<(?:[^<>"']+|"[^"]*"|'[^']*')*>/g;
+const BLOCK_PATTERN = /<(p|li|blockquote)\b(?:[^>"']+|"[^"]*"|'[^']*')*>([\s\S]*?)<\/\1>/gi;
+
+const decodeEntity = (raw: string): string => {
+  const decimalMatch = raw.match(/^&#(\d+);$/i);
+  if (decimalMatch) {
+    const codePoint = Number.parseInt(decimalMatch[1], 10);
+    if (Number.isFinite(codePoint)) {
+      return String.fromCodePoint(codePoint);
+    }
+    return ' ';
+  }
+
+  const hexMatch = raw.match(/^&#x([0-9a-f]+);$/i);
+  if (hexMatch) {
+    const codePoint = Number.parseInt(hexMatch[1], 16);
+    if (Number.isFinite(codePoint)) {
+      return String.fromCodePoint(codePoint);
+    }
+    return ' ';
+  }
+
+  return raw;
+};
 
 const stripHtml = (html: string): string => {
   return html
@@ -12,13 +36,15 @@ const stripHtml = (html: string): string => {
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(TAG_PATTERN, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&#39;/gi, "'")
     .replace(/&quot;/gi, '"')
+    .replace(/&#x[0-9a-f]+;|&#\d+;/gi, (entity) => decodeEntity(entity))
     .replace(/\s+/g, ' ')
     .trim();
 };
@@ -48,9 +74,9 @@ const readMetaContent = (html: string, names: string[]): string | undefined => {
 };
 
 const splitIntoParagraphs = (html: string): string[] => {
-  const paragraphMatches = html.match(/<(p|li|blockquote)[^>]*>[\s\S]*?<\/(p|li|blockquote)>/gi) ?? [];
+  const paragraphMatches = [...html.matchAll(BLOCK_PATTERN)];
   const paragraphs = paragraphMatches
-    .map((segment) => stripHtml(segment))
+    .map((match) => stripHtml(match[2] ?? ''))
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 20);
 

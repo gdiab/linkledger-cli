@@ -4,9 +4,53 @@ import type { ServiceContext } from './context.js';
 
 const splitSentences = (text: string): string[] =>
   text
-    .split(/(?<=[.!?])\s+/)
+    .split(/\n+/)
+    .flatMap((segment) => segment.split(/(?<=[.!?])\s+/))
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+
+const normalizeSpacing = (value: string): string => value.replace(/\s+/g, ' ').trim();
+
+const normalizeClaim = (value: string): string =>
+  normalizeSpacing(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const dedupeClaims = (claims: string[]): string[] => {
+  const deduped: Array<{ raw: string; normalized: string }> = [];
+
+  for (const candidate of claims) {
+    const compact = normalizeSpacing(candidate);
+    if (!compact || /^note\s*:/i.test(compact)) {
+      continue;
+    }
+
+    const normalized = normalizeClaim(compact);
+    if (!normalized) {
+      continue;
+    }
+
+    const duplicateIdx = deduped.findIndex(
+      (entry) =>
+        entry.normalized === normalized ||
+        entry.normalized.includes(normalized) ||
+        normalized.includes(entry.normalized)
+    );
+
+    if (duplicateIdx === -1) {
+      deduped.push({ raw: compact, normalized });
+      continue;
+    }
+
+    if (compact.length > deduped[duplicateIdx].raw.length + 12) {
+      deduped[duplicateIdx] = { raw: compact, normalized };
+    }
+  }
+
+  return deduped.map((entry) => entry.raw);
+};
 
 const truncate = (value: string, max: number): string => {
   if (value.length <= max) {
@@ -28,6 +72,7 @@ export class EnrichmentService {
     const chunkText = this.context.contentChunkRepository.listTextByItemId(itemId).join('\n\n').trim();
     const annotationText = this.context.annotationRepository
       .listByItemId(itemId)
+      .filter((entry) => entry.type !== 'note')
       .map((entry) => `${entry.type}: ${entry.text}`)
       .join('\n');
 
@@ -39,7 +84,9 @@ export class EnrichmentService {
 
     const sentences = splitSentences(base);
     const summary = truncate(sentences.slice(0, 2).join(' '), 320);
-    const keyClaims = sentences.slice(0, 5).map((sentence) => truncate(sentence, 220));
+    const keyClaims = dedupeClaims(sentences)
+      .slice(0, 5)
+      .map((sentence) => truncate(sentence, 220));
     const now = nowIso();
 
     this.context.artifactRepository.upsert({
