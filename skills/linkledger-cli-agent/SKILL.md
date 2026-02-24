@@ -14,9 +14,14 @@ description: Use this skill when an agent needs to store sources in linkledger-c
 - A human sends you a link to remember.
 
 ## Setup
-- Binary: `linkledger` (wrapper at `/opt/homebrew/bin/linkledger`)
-- DB path is pre-configured via the wrapper (`~/.linkledger/linkledger.db`). No env var needed.
-- The wrapper `cd`s into the repo directory automatically — call `linkledger` from anywhere.
+- **If a wrapper script is installed** (e.g., `/opt/homebrew/bin/linkledger`), it handles `cd` into the repo and sets `LINKLEDGER_DB_PATH` automatically — call `linkledger` from anywhere.
+- **Otherwise**, run from the repo directory and set `LINKLEDGER_DB_PATH` explicitly:
+  ```bash
+  export LINKLEDGER_DB_PATH="$HOME/.linkledger/linkledger.db"
+  cd /path/to/linkledger-cli
+  node dist/cli/index.js <command>
+  ```
+- The DB defaults to `.linkledger/linkledger.db` relative to cwd if `LINKLEDGER_DB_PATH` is not set. Set it explicitly to avoid writing to unintended locations.
 
 ## Rules
 - Prefer `--json` on all commands for deterministic machine parsing.
