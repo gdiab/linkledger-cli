@@ -60,6 +60,8 @@ test('find ranks pinned high-confidence annotations above low-confidence annotat
       assert.equal(ranked.length, 2);
       assert.equal(ranked[0]?.id, itemA.id);
       assert.equal(ranked[1]?.id, itemB.id);
+      assert.equal(ranked.every((item) => item.why_ranked.bm25_score >= 0), true);
+      assert.equal((ranked[0]?.why_ranked.ranking_score ?? 0) >= (ranked[1]?.why_ranked.ranking_score ?? 0), true);
       assert.equal(ranked[0]?.why_ranked.pinned_boost > ranked[1]?.why_ranked.pinned_boost, true);
       assert.equal(
         ranked[0]?.why_ranked.low_confidence_penalty < ranked[1]?.why_ranked.low_confidence_penalty,

@@ -32,6 +32,9 @@ export interface SearchRow {
   ranking_score: number;
 }
 
+const PINNED_BOOST_WEIGHT = 0.2;
+const LOW_CONF_PENALTY_WEIGHT = 0.15;
+
 const toFtsQuery = (query: string): string => {
   const tokens = query
     .trim()
@@ -114,7 +117,7 @@ export class SearchIndexRepository {
       WITH ranked AS (
         SELECT
           item_id,
-          bm25(search_fts, 2.5, 1.0, 2.0) AS bm25_score,
+          (-1 * bm25(search_fts, 2.5, 1.0, 2.0)) AS bm25_score,
           snippet(search_fts, 0, '[', ']', '...', 12) AS title_snippet,
           snippet(search_fts, 1, '[', ']', '...', 18) AS chunk_snippet,
           snippet(search_fts, 2, '[', ']', '...', 18) AS annotation_snippet
@@ -131,8 +134,8 @@ export class SearchIndexRepository {
         COALESCE(conf_stats.low_conf_count, 0) AS low_conf_count,
         (
           ranked.bm25_score
-          - (COALESCE(pin_stats.pinned_count, 0) * 0.2)
-          + (COALESCE(conf_stats.low_conf_count, 0) * 0.15)
+          + (COALESCE(pin_stats.pinned_count, 0) * ${PINNED_BOOST_WEIGHT})
+          - (COALESCE(conf_stats.low_conf_count, 0) * ${LOW_CONF_PENALTY_WEIGHT})
         ) AS ranking_score
       FROM ranked
       JOIN items i ON i.id = ranked.item_id
@@ -149,7 +152,7 @@ export class SearchIndexRepository {
         GROUP BY item_id
       ) conf_stats ON conf_stats.item_id = i.id
       ${whereSql}
-      ORDER BY ranking_score ASC, i.updated_at DESC, i.id ASC
+      ORDER BY ranking_score DESC, i.updated_at DESC, i.id ASC
       LIMIT @limit
     `;
 
