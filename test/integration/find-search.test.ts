@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { AnnotationService } from '../../src/services/annotation-service.js';
 import { createServiceContext } from '../../src/services/context.js';
@@ -6,6 +8,9 @@ import { FindService } from '../../src/services/find-service.js';
 import { IngestWorkerService } from '../../src/services/ingest-worker-service.js';
 import { SaveService } from '../../src/services/save-service.js';
 import { withTempDb } from '../helpers/temp-db.js';
+
+const fixture = (folder: string, name: string): string =>
+  readFileSync(path.join(process.cwd(), 'test', 'fixtures', folder, name), 'utf8');
 
 test('find ranks pinned high-confidence annotations above low-confidence annotations', async () => {
   await withTempDb(async () => {
@@ -161,6 +166,50 @@ test('find queues stale revalidation for items older than threshold', async () =
       } else {
         process.env.LINKLEDGER_REVALIDATE_AFTER_DAYS = previousThreshold;
       }
+      globalThis.fetch = originalFetch;
+      context.db.close();
+    }
+  });
+});
+
+test('find supports reddit source-type filtering', async () => {
+  await withTempDb(async () => {
+    const context = createServiceContext();
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+
+      if (url.includes('reddit.com/comments/abc123.json')) {
+        return new Response(fixture('reddit', 'listing.json'), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
+      return new Response(
+        '<html><head><title>Article</title></head><body><p>General article text for control item.</p></body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } }
+      );
+    };
+
+    try {
+      const saveService = new SaveService(context);
+      const worker = new IngestWorkerService(context);
+      const find = new FindService(context);
+
+      const reddit = saveService.execute({
+        url: 'https://www.reddit.com/r/programming/comments/abc123/linkledger_release'
+      }).item;
+      saveService.execute({ url: 'https://example.com/non-reddit-item' });
+
+      await worker.runOnce({ limit: 20, maxAttempts: 3, baseBackoffMs: 0 });
+
+      const filtered = find.execute({ query: 'reusable evidence drafts', sourceType: 'reddit', limit: 10 });
+      assert.equal(filtered.length, 1);
+      assert.equal(filtered[0]?.id, reddit.id);
+      assert.equal(filtered[0]?.source_type, 'reddit');
+    } finally {
       globalThis.fetch = originalFetch;
       context.db.close();
     }

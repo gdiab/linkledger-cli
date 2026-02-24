@@ -27,7 +27,7 @@ node dist/cli/index.js --help
 - `linkledger save <url> [--note "..."] [--tags a,b] [--json]`
 - `linkledger annotate <item-id> --highlight|--lowlight|--note "..." [--actor human|agent:name] [--confidence 0.0-1.0] [--pin] [--json]`
 - `linkledger tag <item-id> --add a,b [--actor ...] [--json]`
-- `linkledger find <query> [--tags ...] [--type article|x|youtube|pdf|bluesky|linkedin] [--since YYYY-MM-DD] [--limit N] [--json]`
+- `linkledger find <query> [--tags ...] [--type article|x|youtube|pdf|bluesky|linkedin|reddit] [--since YYYY-MM-DD] [--limit N] [--json]`
 - `linkledger brief <query> [--max-items N] [--expand-chunks] [--json]`
 - `linkledger related <item-id> [--max-items N] [--json]`
 - `linkledger status <item-id> [--json]`
@@ -43,6 +43,7 @@ node dist/cli/index.js --help
 - `pdf`: text-native PDF extraction via content stream parsing.
 - `bluesky`: oEmbed + page metadata extraction with article fallback.
 - `linkedin`: page metadata extraction with LinkedIn-specific parsing.
+- `reddit`: Reddit listing API extraction for post + top comments with article fallback.
 
 Retryable adapter failures are requeued with exponential backoff in `worker`.
 
@@ -71,3 +72,12 @@ An agent-usage skill is included at:
 - Benchmarking: `docs/benchmarking.md`
 - Agent brief workflow: `docs/agent-brief-workflow.md`
 - Human validation playbook: `docs/human-test-plan.md`
+
+## Maintenance
+
+- Backfill legacy Reddit items previously saved as `article`:
+
+```bash
+npm run backfill:reddit -- --dry-run
+npm run backfill:reddit
+```

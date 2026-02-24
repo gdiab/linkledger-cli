@@ -116,7 +116,7 @@ test('worker requeues retryable failures with backoff and succeeds on next run',
   });
 });
 
-test('worker uses first-class Bluesky and LinkedIn adapters', async () => {
+test('worker uses first-class Bluesky, LinkedIn, and Reddit adapters', async () => {
   await withTempDb(async () => {
     const context = createServiceContext();
     const save = new SaveService(context);
@@ -140,6 +140,13 @@ test('worker uses first-class Bluesky and LinkedIn adapters', async () => {
         });
       }
 
+      if (url.includes('reddit.com/comments/abc123.json')) {
+        return new Response(fixture('reddit', 'listing.json'), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
       return new Response('<html><body>fallback article</body></html>', {
         status: 200,
         headers: { 'content-type': 'text/html' }
@@ -153,9 +160,12 @@ test('worker uses first-class Bluesky and LinkedIn adapters', async () => {
       const linkedinItem = save.execute({
         url: 'https://www.linkedin.com/posts/gdiab_memory-layer-cli'
       }).item;
+      const redditItem = save.execute({
+        url: 'https://old.reddit.com/r/programming/comments/abc123/linkledger_release/?context=3&utm_source=share'
+      }).item;
 
       const run = await worker.runOnce({ limit: 20, maxAttempts: 3, baseBackoffMs: 0 });
-      assert.equal(run.succeeded, 2);
+      assert.equal(run.succeeded, 3);
       assert.equal(run.failed, 0);
       assert.equal(run.requeued, 0);
 
@@ -169,6 +179,13 @@ test('worker uses first-class Bluesky and LinkedIn adapters', async () => {
       assert.equal(linkedin.source_type, 'linkedin');
       assert.equal(linkedin.ingest_status, 'enriched');
       assert.equal(linkedin.author, 'George Diab');
+
+      const reddit = context.itemRepository.findById(redditItem.id);
+      assert.ok(reddit);
+      assert.equal(reddit.source_type, 'reddit');
+      assert.equal(reddit.canonical_url, 'https://www.reddit.com/comments/abc123');
+      assert.equal(reddit.ingest_status, 'enriched');
+      assert.equal(reddit.title, 'Shipping local-first memory for agents');
     } finally {
       globalThis.fetch = originalFetch;
       context.db.close();

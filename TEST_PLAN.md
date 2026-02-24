@@ -36,6 +36,7 @@
 - Keyword match in annotation text.
 - Combined filters (`--tags`, `--type`, `--since`).
 - Stable sort when scores tie.
+- Reddit-specific source filtering (`--type reddit`) against post/comment text.
 
 3. `annotate`
 - Reject missing confidence for agent actor.
@@ -67,6 +68,10 @@
 - PDF fixtures:
   - text-native PDF
   - image-heavy/low-text PDF
+
+- Reddit fixtures:
+  - post with self text + top comments
+  - fallback behavior when listing API fails
 
 ## 5. Performance Tests
 ### Dataset sizes
@@ -105,3 +110,4 @@
 2. Add human and agent highlights; verify cap and confidence rules.
 3. Run topic `brief` and verify evidence quality manually.
 4. Re-run after 30+ day staleness simulation and verify revalidation behavior.
+5. Validate Reddit URL canonicalization (`redd.it`, `old.reddit.com`) and backfill dry run.

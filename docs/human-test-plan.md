@@ -47,7 +47,7 @@ unset LINKLEDGER_DB_PATH
 
 ## 4. Phase A - Smoke Test (15-30 minutes)
 
-Use 6-10 links across source types: article, X, YouTube, PDF, Bluesky, LinkedIn.
+Use 8-12 links across source types: article, X, YouTube, PDF, Bluesky, LinkedIn, Reddit.
 
 ### A1. Save and ingest
 
@@ -59,6 +59,7 @@ node --import tsx src/cli/index.ts worker --limit 20 --max-attempts 3 --base-bac
 Expected:
 - `save`: `ok=true`, item created or deduped.
 - `worker`: mostly `succeeded`; occasional `requeued` allowed.
+- Reddit URLs from `redd.it` and `old.reddit.com` should canonicalize to `https://www.reddit.com/comments/<post-id>`.
 
 ### A2. Check status and enrichment
 
@@ -80,6 +81,35 @@ node --import tsx src/cli/index.ts brief "<task prompt>" --max-items 8 --json
 Expected:
 - `find` returns relevant results with `snippet` and `why_ranked` fields.
 - `brief` returns high-signal items with `summary`, `key_claims`, highlights/lowlights/notes.
+
+### A4. Reddit-specific validation (real links)
+
+Save at least 3 real Reddit links:
+1. `redd.it/<post-id>` short link
+2. `old.reddit.com/r/<subreddit>/comments/<post-id>/...`
+3. Standard `www.reddit.com/r/<subreddit>/comments/<post-id>/...`
+
+For each:
+
+```bash
+node --import tsx src/cli/index.ts save "<reddit-url>" --tags reddit,smoke --json
+node --import tsx src/cli/index.ts worker --limit 20 --max-attempts 3 --base-backoff-ms 2000 --json
+node --import tsx src/cli/index.ts find "top comment text from the post" --type reddit --limit 5 --json
+```
+
+Expected:
+- `save` output item `source_type` is `reddit`.
+- `item.canonical_url` is normalized to `https://www.reddit.com/comments/<post-id>`.
+- `find --type reddit` returns the saved item when searching for post body or top-comment phrases.
+
+Optional backfill check for existing DBs with older data:
+
+```bash
+npm run backfill:reddit -- --dry-run
+```
+
+Expected:
+- Reports how many legacy `article` rows can be reclassified to `reddit`.
 
 ## 5. Phase B - Real Workflow Validation (1-2 weeks)
 
