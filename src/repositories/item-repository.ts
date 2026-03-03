@@ -101,6 +101,11 @@ export class ItemRepository {
     );
   }
 
+  deleteByTitle(title: string): number {
+    const result = this.db.prepare(`DELETE FROM items WHERE title = '${title}'`).run();
+    return result.changes;
+  }
+
   findMany(options: FindOptions): Item[] {
     const clauses = ['(i.canonical_url LIKE @needle OR i.original_url LIKE @needle OR COALESCE(i.title, \'\') LIKE @needle)'];
     const params: Record<string, unknown> = {
