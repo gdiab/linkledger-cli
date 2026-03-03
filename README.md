@@ -35,7 +35,7 @@ node dist/cli/index.js --help
 - `linkledger index-rebuild [--json]`
 - `linkledger worker [--limit N] [--max-attempts N] [--base-backoff-ms N] [--json]`
 
-## Ingestion adapters (M2)
+## Ingestion adapters
 
 - `article`: HTML extraction and chunking.
 - `x`: oEmbed-based extraction with fallback to article adapter.
@@ -47,7 +47,7 @@ node dist/cli/index.js --help
 
 Retryable adapter failures are requeued with exponential backoff in `worker`.
 
-In M3, successful ingest also creates enrichment artifacts and moves items to `enriched`.
+Successful ingest also creates enrichment artifacts (summary, key claims) and moves items to `enriched` status.
 
 ## Database path
 

@@ -7,6 +7,9 @@ import type { AdapterParseResult, SourceAdapter } from './source-adapter.js';
 
 const MAX_POST_CHARS = 1800;
 const MAX_COMMENT_CHARS = 900;
+// limit=8 in the fetch URL over-fetches to buffer for non-comment children
+// (e.g. kind:'more' stubs) that get filtered out, ensuring we still collect
+// up to MAX_COMMENTS actual t1 comments.
 const MAX_COMMENTS = 5;
 
 interface RedditListingChild {
@@ -59,15 +62,6 @@ const toPublishedAt = (value: unknown): string | undefined => {
   return new Date(value * 1000).toISOString();
 };
 
-const isRedditPageUrl = (value: string): boolean => {
-  try {
-    const parsed = new URL(value);
-    return isRedditHost(parsed.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-};
-
 export class RedditAdapter implements SourceAdapter {
   supports(url: string): boolean {
     return this.detectType(url) === 'reddit';
@@ -109,13 +103,15 @@ export class RedditAdapter implements SourceAdapter {
     const subreddit = compact(toText(postData.subreddit));
     const selfText = compact(toText(postData.selftext));
     const linkedUrl = compact(toText(postData.url));
+    let isLinkedReddit = false;
+    try { isLinkedReddit = isRedditHost(new URL(linkedUrl).hostname.toLowerCase()); } catch { /* malformed URL */ }
 
     const postParts = [
       title ? `Title: ${title}` : '',
       subreddit ? `Subreddit: r/${subreddit}` : '',
       author ? `Author: u/${author}` : '',
       selfText ? `Body:\n${selfText}` : '',
-      linkedUrl && !isRedditPageUrl(linkedUrl) ? `Linked URL: ${linkedUrl}` : ''
+      linkedUrl && !isLinkedReddit ? `Linked URL: ${linkedUrl}` : ''
     ].filter(Boolean);
 
     const chunks: Array<{ text: string; tokenCount: number }> = [];

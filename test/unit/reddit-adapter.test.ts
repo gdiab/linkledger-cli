@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { AppError } from '../../src/lib/errors.js';
 import { RedditAdapter } from '../../src/adapters/reddit-adapter.js';
 
 const fixture = (name: string): string =>
@@ -50,6 +51,31 @@ test('RedditAdapter marks upstream failures as retryable for 5xx', async () => {
         const typed = error as { code?: string; retryable?: boolean };
         assert.equal(typed.code, 'FETCH_FAILED');
         assert.equal(typed.retryable, true);
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('RedditAdapter marks 404 as non-retryable', async () => {
+  const adapter = new RedditAdapter();
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () =>
+    new Response('not found', {
+      status: 404,
+      headers: { 'content-type': 'text/plain' }
+    });
+
+  try {
+    await assert.rejects(
+      () => adapter.fetchAndParse({ url: 'https://www.reddit.com/comments/abc123' }),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.code, 'FETCH_FAILED');
+        assert.equal(error.retryable, false);
         return true;
       }
     );
